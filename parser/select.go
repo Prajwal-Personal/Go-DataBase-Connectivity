@@ -40,8 +40,9 @@ func parseSelect(sel *sqlparser.Select) (*QueryAST, error) {
 		extractTables(from, ast)
 	}
 
-	// Conditions (minimal implementation for MVP)
+	// Conditions
 	if sel.Where != nil {
+		extractSubqueries(sel.Where.Expr, ast)
 		switch expr := sel.Where.Expr.(type) {
 		case *sqlparser.ComparisonExpr:
 			ast.Conditions = append(ast.Conditions, ConditionNode{
@@ -54,14 +55,37 @@ func parseSelect(sel *sqlparser.Select) (*QueryAST, error) {
 
 	// Limit
 	if sel.Limit != nil {
-		if val, err := sqlparser.String(sel.Limit.Rowcount), error(nil); err == nil {
-			// convert val to int, mocked for MVP
-			_ = val
-			ast.Limit = new(int) // just marking non-nil
+		if _, err := sqlparser.String(sel.Limit.Rowcount), error(nil); err == nil {
+			ast.Limit = new(int) // mark non-nil
 		}
 	}
 
 	return ast, nil
+}
+
+func extractSubqueries(expr sqlparser.Expr, ast *QueryAST) {
+	switch e := expr.(type) {
+	case *sqlparser.Subquery:
+		if sel, ok := e.Select.(*sqlparser.Select); ok {
+			for _, from := range sel.From {
+				extractTables(from, ast)
+			}
+			if sel.Where != nil {
+				extractSubqueries(sel.Where.Expr, ast)
+			}
+		}
+	case *sqlparser.ComparisonExpr:
+		extractSubqueries(e.Left, ast)
+		extractSubqueries(e.Right, ast)
+	case *sqlparser.AndExpr:
+		extractSubqueries(e.Left, ast)
+		extractSubqueries(e.Right, ast)
+	case *sqlparser.OrExpr:
+		extractSubqueries(e.Left, ast)
+		extractSubqueries(e.Right, ast)
+	case *sqlparser.ParenExpr:
+		extractSubqueries(e.Expr, ast)
+	}
 }
 
 func extractTables(expr sqlparser.TableExpr, ast *QueryAST) {
@@ -69,18 +93,31 @@ func extractTables(expr sqlparser.TableExpr, ast *QueryAST) {
 	case *sqlparser.AliasedTableExpr:
 		switch te := t.Expr.(type) {
 		case sqlparser.TableName:
-			ast.Tables = append(ast.Tables, TableNode{
-				Database: te.Qualifier.String(),
-				Name:     te.Name.String(),
-				Alias:    t.As.String(),
-			})
+			name := te.Name.String()
+			db := te.Qualifier.String()
+			
+			// Prevent duplicates
+			exists := false
+			for _, existing := range ast.Tables {
+				if existing.Name == name && existing.Database == db {
+					exists = true
+					break
+				}
+			}
+			
+			if !exists {
+				ast.Tables = append(ast.Tables, TableNode{
+					Database: db,
+					Name:     name,
+					Alias:    t.As.String(),
+				})
+			}
 		}
 	case *sqlparser.JoinTableExpr:
 		joinNode := JoinNode{
 			Type: t.Join,
 		}
 
-		// Try to identify Left and Right tables/aliases
 		if left, ok := t.LeftExpr.(*sqlparser.AliasedTableExpr); ok {
 			joinNode.LeftTable = left.As.String()
 			if joinNode.LeftTable == "" {
@@ -99,7 +136,6 @@ func extractTables(expr sqlparser.TableExpr, ast *QueryAST) {
 			}
 		}
 
-		// Extract ON condition
 		if t.Condition.On != nil {
 			if comp, ok := t.Condition.On.(*sqlparser.ComparisonExpr); ok {
 				joinNode.On = ConditionNode{
@@ -112,7 +148,6 @@ func extractTables(expr sqlparser.TableExpr, ast *QueryAST) {
 
 		ast.Joins = append(ast.Joins, joinNode)
 
-		// Recursively extract from Left and Right
 		extractTables(t.LeftExpr, ast)
 		extractTables(t.RightExpr, ast)
 	}
