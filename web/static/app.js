@@ -1,5 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Elements
+    // Elements - Navigation
+    const navItems = document.querySelectorAll('.nav-item');
+    const views = document.querySelectorAll('.view');
+
+    // Elements - Dashboard
     const queryInput = document.getElementById('query-input');
     const runBtn = document.getElementById('run-btn');
     const btnText = runBtn.querySelector('span');
@@ -8,37 +12,63 @@ document.addEventListener('DOMContentLoaded', () => {
     const errorText = document.getElementById('error-text');
     const cacheBanner = document.getElementById('cache-banner');
     
-    // Feature Sections
+    // Elements - SQL Lab
+    const labQueryInput = document.getElementById('lab-query-input');
+    const labParseBtn = document.getElementById('lab-parse-btn');
+    const labAstOutput = document.getElementById('lab-ast-output');
+
+    // Elements - Shield
+    const shieldInput = document.getElementById('shield-input');
+    const shieldResultCard = document.getElementById('shield-result-card');
+    const shieldStatusText = document.getElementById('shield-status-text');
+    const shieldReasonText = document.getElementById('shield-reason-text');
+
+    // Elements - Explorer
+    const explorerSchemaList = document.getElementById('explorer-schema-list');
+    const explorerDetails = document.getElementById('explorer-details');
+
+    // State
+    let currentView = 'dashboard';
+    let schemas = null;
+
+    // --- NAVIGATION LOGIC ---
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const viewId = item.getAttribute('data-view');
+            switchView(viewId);
+        });
+    });
+
+    function switchView(viewId) {
+        currentView = viewId;
+        
+        // Update Nav
+        navItems.forEach(i => i.classList.remove('active'));
+        document.querySelector(`.nav-item[data-view="${viewId}"]`).classList.add('active');
+
+        // Update Views
+        views.forEach(v => v.classList.add('hidden'));
+        document.getElementById(`view-${viewId}`).classList.remove('hidden');
+
+        // View Specific Initialization
+        if (viewId === 'explorer' && !schemas) fetchSchemas();
+        if (viewId === 'metrics') fetchStats();
+    }
+
+    // --- DASHBOARD LOGIC (Original Pipeline) ---
     const sections = {
         parser: document.getElementById('section-parser'),
         security: document.getElementById('section-security'),
         planner: document.getElementById('section-planner'),
-        stats: document.getElementById('section-stats'),
         executor: document.getElementById('section-executor')
     };
-    
     const connectors = document.querySelectorAll('.pipeline-connector');
-
-    // Fetch initial stats
-    fetchStats();
 
     runBtn.addEventListener('click', async () => {
         const query = queryInput.value.trim();
         if (!query) return;
 
-        // Reset UI
-        errorBanner.classList.add('hidden');
-        cacheBanner.classList.add('hidden');
-        btnText.classList.add('hidden');
-        btnLoader.classList.remove('hidden');
-        runBtn.disabled = true;
-
-        // Dim all sections
-        Object.values(sections).forEach(s => {
-            s.classList.remove('focus', 'done');
-        });
-        connectors.forEach(c => c.classList.remove('active'));
-
+        resetUI();
         try {
             await executePipelineCascade(query);
         } catch (err) {
@@ -50,10 +80,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    const delay = ms => new Promise(res => setTimeout(res, ms));
+    function resetUI() {
+        errorBanner.classList.add('hidden');
+        cacheBanner.classList.add('hidden');
+        btnText.classList.add('hidden');
+        btnLoader.classList.remove('hidden');
+        runBtn.disabled = true;
+
+        Object.values(sections).forEach(s => s.classList.remove('focus', 'done'));
+        connectors.forEach(c => c.classList.remove('active'));
+    }
 
     async function executePipelineCascade(query) {
-        // Fetch data
         const response = await fetch('/api/query', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -61,148 +99,201 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         const data = await response.json();
 
-        // If Cache Hit: Bypass the flow
         if (data.cache_hit) {
             cacheBanner.classList.remove('hidden');
-            
-            // Light everything up immediately
             connectors.forEach(c => c.classList.add('active'));
             Object.values(sections).forEach(s => s.classList.add('done'));
-            
             updateResultsTab(data.results);
             updateMetrics(data.metrics);
-            sections.executor.scrollIntoView({ behavior: 'smooth', block: 'center' });
             return;
         }
 
-        // --- STEP 1: PARSER ---
+        // Phase 1: Parser
         connectors[0].classList.add('active');
         sections.parser.classList.add('focus');
-        sections.parser.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        
         await delay(600);
-        
-        if (!data.ast) {
-            document.getElementById('parser-status').textContent = "ERROR: Could not parse query!";
-            showError(data.error);
-            return;
-        }
-        document.getElementById('parser-status').textContent = "Abstract Syntax Tree successfully generated.";
-        document.getElementById('parser-status').style.color = 'var(--success)';
-        document.getElementById('parser-status').style.borderColor = 'var(--success)';
         document.getElementById('ast-json').textContent = JSON.stringify(data.ast, null, 2);
-        try { hljs.highlightElement(document.getElementById('ast-json')); } catch(e) {}
-        
-        sections.parser.classList.remove('focus');
-        sections.parser.classList.add('done');
+        hljs.highlightElement(document.getElementById('ast-json'));
+        sections.parser.classList.replace('focus', 'done');
 
-        // --- STEP 2: SECURITY ENGINE ---
+        // Phase 2: Security
         connectors[1].classList.add('active');
         sections.security.classList.add('focus');
-        sections.security.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        
         await delay(600);
-        sections.security.classList.remove('focus');
-        sections.security.classList.add('done');
+        updateSecurityUI(data.decision, 'sec-status', 'sec-reason');
+        sections.security.classList.replace('focus', 'done');
+        if (data.decision.Block) return;
 
-        if (data.decision && data.decision.Block) {
-            updateSecurityTab(data.decision);
-            showError(data.error);
-            return;
-        }
-        updateSecurityTab(data.decision);
-
-        // --- STEP 3: PLANNER & ROUTING ---
+        // Phase 3: Planner
         connectors[2].classList.add('active');
         sections.planner.classList.add('focus');
-        sections.planner.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
         await delay(600);
-        if (!data.plan) {
-            document.getElementById('planner-status').textContent = "ERROR: Failed to route query";
-            showError(data.error);
-            return;
-        }
-        document.getElementById('planner-status').textContent = "Query split into physical database steps. NoSQL translation applied if required.";
-        document.getElementById('planner-status').style.color = 'var(--success)';
-        document.getElementById('planner-status').style.borderColor = 'var(--success)';
-        updatePlanTab(data.plan);
+        updatePlanUI(data.plan);
+        sections.planner.classList.replace('focus', 'done');
 
-        sections.planner.classList.remove('focus');
-        sections.planner.classList.add('done');
-
-        // --- STEP 4: POOL ACTIVATION ---
-        // Refresh live stats
+        // Phase 4: Executor
         connectors[3].classList.add('active');
-        sections.stats.classList.add('focus');
-        sections.stats.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        await fetchStats();
-        
-        await delay(800);
-        sections.stats.classList.remove('focus');
-        sections.stats.classList.add('done');
-
-        // --- STEP 5: FINAL EXECUTION ---
-        connectors[4].classList.add('active');
         sections.executor.classList.add('focus');
-        sections.executor.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
         await delay(400);
         updateResultsTab(data.results);
         updateMetrics(data.metrics);
-        
-        sections.executor.classList.remove('focus');
-        sections.executor.classList.add('done');
+        sections.executor.classList.replace('focus', 'done');
     }
 
-    function showError(msg) {
-        errorText.textContent = msg;
-        errorBanner.classList.remove('hidden');
-    }
-
-    function updateSecurityTab(dec) {
-        const statusEl = document.getElementById('sec-status');
-        const reasonEl = document.getElementById('sec-reason');
+    // --- SQL LAB LOGIC ---
+    labParseBtn.addEventListener('click', async () => {
+        const query = labQueryInput.value.trim();
+        if (!query) return;
         
-        statusEl.className = 'sec-status';
-        if (!dec || (!dec.Block && !dec.Flag)) {
-            statusEl.textContent = "Safe Query";
-            statusEl.classList.add('safe');
-            reasonEl.textContent = "No anomalies or injections detected.";
-        } else if (dec.Block) {
-            statusEl.textContent = "Query Blocked";
-            statusEl.classList.add('blocked');
-            reasonEl.textContent = dec.Reason;
-        } else if (dec.Flag) {
-            statusEl.textContent = "Query Flagged";
-            statusEl.classList.add('flagged');
-            reasonEl.textContent = dec.Reason;
+        labParseBtn.disabled = true;
+        labAstOutput.textContent = "Parsing...";
+
+        try {
+            const response = await fetch('/api/query', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query })
+            });
+            const data = await response.json();
+            labAstOutput.textContent = JSON.stringify(data.ast || data.error, null, 2);
+            hljs.highlightElement(labAstOutput);
+        } catch (e) {
+            labAstOutput.textContent = "Error: " + e.message;
+        } finally {
+            labParseBtn.disabled = false;
         }
-    }
+    });
 
-    function updatePlanTab(plan) {
-        const container = document.getElementById('plan-container');
-        container.innerHTML = '';
-        
-        if (!plan.Steps || plan.Steps.length === 0) {
-            container.innerHTML = '<div class="empty-state">No steps in plan.</div>';
+    // --- SHIELD LOGIC ---
+    shieldInput.addEventListener('input', debounce(async () => {
+        const query = shieldInput.value.trim();
+        if (!query) {
+            resetShield();
             return;
         }
 
+        const response = await fetch('/api/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query })
+        });
+        const data = await response.json();
+        
+        updateShieldUI(data.decision);
+    }, 500));
+
+    function updateShieldUI(dec) {
+        shieldResultCard.className = 'sec-result-card';
+        if (dec.Block) {
+            shieldResultCard.classList.add('danger');
+            shieldStatusText.textContent = "THREAT DETECTED";
+            shieldReasonText.textContent = dec.Reason;
+            document.querySelector('#shield-result-card .pulse-icon').textContent = '🚫';
+        } else {
+            shieldResultCard.classList.add('success');
+            shieldStatusText.textContent = "QUERY SECURE";
+            shieldReasonText.textContent = "No malicious patterns found in AST.";
+            document.querySelector('#shield-result-card .pulse-icon').textContent = '✅';
+        }
+    }
+
+    function resetShield() {
+        shieldResultCard.className = 'sec-result-card';
+        shieldStatusText.textContent = "Ready to Scan";
+        shieldReasonText.textContent = "Enter a query to test security heuristics.";
+        document.querySelector('#shield-result-card .pulse-icon').textContent = '🛡️';
+    }
+
+    // --- EXPLORER LOGIC ---
+    async function fetchSchemas() {
+        try {
+            const response = await fetch('/api/schema');
+            schemas = await response.json();
+            renderSchemaList();
+        } catch (e) {
+            explorerSchemaList.innerHTML = `<div class="error-text">Failed to load schemas</div>`;
+        }
+    }
+
+    function renderSchemaList() {
+        explorerSchemaList.innerHTML = '';
+        for (const [db, tables] of Object.entries(schemas)) {
+            const dbDiv = document.createElement('div');
+            dbDiv.className = 'schema-db';
+            dbDiv.innerHTML = `
+                <span class="db-name">${db}</span>
+                <ul class="table-list">
+                    ${tables.map(t => `<li class="table-item" data-db="${db}" data-table="${t.name}">${t.name}</li>`).join('')}
+                </ul>
+            `;
+            explorerSchemaList.appendChild(dbDiv);
+        }
+
+        explorerSchemaList.querySelectorAll('.table-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const db = item.getAttribute('data-db');
+                const tableName = item.getAttribute('data-table');
+                showTableDetails(db, tableName);
+                
+                explorerSchemaList.querySelectorAll('.table-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+            });
+        });
+    }
+
+    function showTableDetails(db, tableName) {
+        const table = schemas[db].find(t => t.name === tableName);
+        explorerDetails.innerHTML = `
+            <h3 style="margin-bottom: 1rem; color: var(--accent);">${db.toUpperCase()}.${tableName}</h3>
+            <table style="font-size: 0.9rem;">
+                <thead><tr><th>Column Name</th><th>Type (Inferred)</th></tr></thead>
+                <tbody>
+                    ${table.columns.map(c => `<tr><td>${c}</td><td>${inferType(c)}</td></tr>`).join('')}
+                </tbody>
+            </table>
+            <div style="margin-top: 2rem;">
+                <h4 style="margin-bottom: 0.5rem; opacity: 0.7;">Sample Data</h4>
+                <p style="font-size: 0.8rem; color: var(--text-muted);">Fetching live samples from ${db} instance...</p>
+            </div>
+        `;
+    }
+
+    function inferType(col) {
+        if (col.includes('id')) return 'SERIAL / INT';
+        if (col.includes('at') || col.includes('timestamp')) return 'TIMESTAMP';
+        if (col.includes('total') || col.includes('amount')) return 'DECIMAL';
+        return 'VARCHAR(255)';
+    }
+
+    // --- HELPERS ---
+    function updateSecurityUI(dec, statusId, reasonId) {
+        const statusEl = document.getElementById(statusId);
+        const reasonEl = document.getElementById(reasonId);
+        statusEl.className = 'sec-status';
+        if (dec.Block) {
+            statusEl.textContent = "Blocked";
+            statusEl.classList.add('blocked');
+            reasonEl.textContent = dec.Reason;
+        } else {
+            statusEl.textContent = "Safe";
+            statusEl.classList.add('safe');
+            reasonEl.textContent = "Clean";
+        }
+    }
+
+    function updatePlanUI(plan) {
+        const container = document.getElementById('plan-container');
+        container.innerHTML = '';
         plan.Steps.forEach(step => {
             const card = document.createElement('div');
             card.className = 'plan-card';
-            
-            let dependsHtml = step.DependsOn ? `<span>Depends on: ${step.DependsOn.join(', ')}</span>` : '';
-            
             card.innerHTML = `
                 <div class="step-id">${step.ID}</div>
                 <div class="step-details">
                     <div class="step-type">${step.Type}</div>
                     <div class="step-meta">
-                        ${step.Database ? `<span class="step-db">Target: ${step.Database.toUpperCase()}</span>` : ''}
-                        ${dependsHtml}
-                        ${step.Query ? `<div style="margin-top: 5px;"><code>${step.Query}</code></div>` : ''}
+                        <span class="step-db">${step.Database || 'FEDERATOR'}</span>
+                        <div style="font-size: 0.7rem; margin-top: 4px;"><code>${step.Query || ''}</code></div>
                     </div>
                 </div>
             `;
@@ -219,83 +310,47 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!rows || rows.length === 0) {
             empty.classList.remove('hidden');
             table.classList.add('hidden');
-            empty.textContent = "Query returned 0 rows.";
             return;
         }
 
         empty.classList.add('hidden');
         table.classList.remove('hidden');
-        
-        // Headers
-        thead.innerHTML = '';
-        const cols = Object.keys(rows[0]);
-        cols.forEach(c => {
-            const th = document.createElement('th');
-            th.textContent = c;
-            thead.appendChild(th);
-        });
-
-        // Body
-        tbody.innerHTML = '';
-        rows.forEach(row => {
-            const tr = document.createElement('tr');
-            cols.forEach(c => {
-                const td = document.createElement('td');
-                td.textContent = row[c] !== null ? row[c] : 'NULL';
-                tr.appendChild(td);
-            });
-            tbody.appendChild(tr);
-        });
+        thead.innerHTML = Object.keys(rows[0]).map(c => `<th>${c}</th>`).join('');
+        tbody.innerHTML = rows.map(row => `<tr>${Object.values(row).map(v => `<td>${v}</td>`).join('')}</tr>`).join('');
     }
 
     function updateMetrics(metrics) {
         if (!metrics) return;
-        document.getElementById('metrics-bar').classList.remove('hidden');
-        
-        document.getElementById('m-total').textContent = (metrics.total_time_ms || 0).toFixed(2) + 'ms';
-        document.getElementById('m-security').textContent = (metrics.security_time_ms || 0).toFixed(2) + 'ms';
-        document.getElementById('m-parse').textContent = (metrics.parse_time_ms || 0).toFixed(2) + 'ms';
-        document.getElementById('m-plan').textContent = (metrics.plan_time_ms || 0).toFixed(2) + 'ms';
-        document.getElementById('m-exec').textContent = (metrics.exec_time_ms || 0).toFixed(2) + 'ms';
+        ['total', 'security', 'parse', 'plan', 'exec'].forEach(m => {
+            const val = (metrics[m + '_time_ms'] || 0).toFixed(2) + 'ms';
+            if (document.getElementById('m-' + m)) document.getElementById('m-' + m).textContent = val;
+            if (document.getElementById('pm-' + m)) document.getElementById('pm-' + m).textContent = val;
+        });
     }
 
     async function fetchStats() {
-        try {
-            const response = await fetch('/api/stats');
-            const data = await response.json();
-            
-            const grid = document.getElementById('stats-grid');
-            grid.innerHTML = '';
-
-            for (const [db, stats] of Object.entries(data)) {
-                const percent = (stats.active / stats.max) * 100;
-                
-                let dbClass = 'db-postgres';
-                if (db === 'mysql') dbClass = 'db-mysql';
-                if (db === 'mongodb') dbClass = 'db-mongodb';
-
-                let fillColor = '#3b82f6';
-                if (percent > 80) fillColor = '#ef4444';
-                else if (percent > 60) fillColor = '#f59e0b';
-
-                grid.innerHTML += `
-                    <div class="stat-card">
-                        <div class="stat-header">
-                            <span class="${dbClass}">${db.toUpperCase()} Connection Pool</span>
-                            <span>${stats.active} / ${stats.max} Uses</span>
-                        </div>
-                        <div class="gauge-bar">
-                            <div class="gauge-fill" style="width: ${percent}%; background: ${fillColor}"></div>
-                        </div>
-                        <div class="stat-details">
-                            <span>Active: ${stats.active}</span>
-                            <span>Idle: ${stats.idle}</span>
-                        </div>
-                    </div>
-                `;
-            }
-        } catch (e) {
-            console.error(e);
+        const response = await fetch('/api/stats');
+        const data = await response.json();
+        const grid = document.getElementById('metrics-stats-grid');
+        grid.innerHTML = '';
+        for (const [db, stats] of Object.entries(data)) {
+            const percent = (stats.active / stats.max) * 100;
+            grid.innerHTML += `
+                <div class="stat-card">
+                    <div class="stat-header"><span>${db.toUpperCase()}</span><span>${stats.active}/${stats.max}</span></div>
+                    <div class="gauge-bar"><div class="gauge-fill" style="width:${percent}%; background:${percent > 80 ? '#ef4444' : '#3b82f6'}"></div></div>
+                </div>
+            `;
         }
+    }
+
+    function delay(ms) { return new Promise(res => setTimeout(res, ms)); }
+
+    function debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
     }
 });

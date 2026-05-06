@@ -152,7 +152,28 @@ func StartServer(port int) error {
 	http.Handle("/", fs)
 	http.HandleFunc("/api/query", handleQuery)
 	http.HandleFunc("/api/stats", handleStats)
+	http.HandleFunc("/api/schema", handleSchema)
 
 	fmt.Printf("Web Dashboard running at http://localhost:%d\n", port)
 	return http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 }
+
+func handleSchema(w http.ResponseWriter, r *http.Request) {
+	schema := map[string]interface{}{
+		"postgres": []map[string]interface{}{
+			{"name": "users", "columns": []string{"id", "name", "email", "created_at"}},
+			{"name": "profiles", "columns": []string{"user_id", "bio", "avatar_url"}},
+		},
+		"mysql": []map[string]interface{}{
+			{"name": "orders", "columns": []string{"id", "user_id", "total", "status"}},
+			{"name": "items", "columns": []string{"id", "order_id", "product_id", "quantity"}},
+		},
+		"mongodb": []map[string]interface{}{
+			{"name": "logs", "columns": []string{"_id", "level", "message", "timestamp"}},
+			{"name": "sessions", "columns": []string{"_id", "user_id", "token", "expires"}},
+		},
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(schema)
+}
+

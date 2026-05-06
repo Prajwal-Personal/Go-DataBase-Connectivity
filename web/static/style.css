@@ -28,8 +28,94 @@ body {
     background-attachment: fixed;
     color: var(--text-main);
     min-height: 100vh;
-    padding: 2rem;
     overflow-x: hidden;
+}
+
+/* Layout structure */
+.layout-wrapper {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: 280px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    border-right: 1px solid var(--glass-border);
+    display: flex;
+    flex-direction: column;
+    padding: 2rem 1rem;
+    position: fixed;
+    height: 100vh;
+    z-index: 100;
+}
+
+.main-content {
+    flex: 1;
+    margin-left: 280px;
+    padding: 2rem;
+    width: calc(100% - 280px);
+}
+
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 3rem;
+    padding: 0 1rem;
+}
+
+.sidebar-header .logo-icon { font-size: 1.8rem; }
+.sidebar-header h1 { 
+    font-size: 1.4rem; 
+    font-weight: 800;
+    background: linear-gradient(to right, #60a5fa, #c084fc);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.nav-links {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.8rem 1rem;
+    border-radius: 12px;
+    color: var(--text-muted);
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-weight: 500;
+}
+
+.nav-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-main);
+}
+
+.nav-item.active {
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--accent);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.nav-item .icon { font-size: 1.2rem; }
+
+/* Views management */
+.view {
+    animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .app-container {
@@ -37,8 +123,126 @@ body {
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 0; /* Connected by the pipeline line */
+    gap: 0;
 }
+
+/* New Component Styles */
+.lab-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+.ast-tree-container {
+    background: rgba(15, 23, 42, 0.8);
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    padding: 1.5rem;
+    height: 500px;
+    overflow-y: auto;
+}
+
+.explorer-grid {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 2rem;
+    height: 600px;
+}
+
+.schema-list {
+    background: rgba(0,0,0,0.2);
+    border-radius: 12px;
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+.schema-db { margin-bottom: 1.5rem; }
+.db-name { 
+    font-weight: 700; 
+    font-size: 0.8rem; 
+    text-transform: uppercase; 
+    color: var(--accent); 
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.table-list {
+    list-style: none;
+    padding-left: 0.5rem;
+}
+
+.table-item {
+    padding: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: 0.2s;
+}
+
+.table-item:hover, .table-item.active {
+    background: rgba(255,255,255,0.05);
+    color: var(--text-main);
+}
+
+.explorer-details {
+    background: rgba(15, 23, 42, 0.6);
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    padding: 2rem;
+}
+
+.shield-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.security-playground {
+    margin-top: 2rem;
+}
+
+.sec-result-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 16px;
+    padding: 2.5rem;
+    text-align: center;
+    border: 2px dashed var(--glass-border);
+    transition: all 0.5s;
+}
+
+.sec-result-card.danger {
+    border-color: var(--danger);
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.sec-result-card.success {
+    border-color: var(--success);
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.pulse-icon {
+    font-size: 4rem;
+    margin-bottom: 1.5rem;
+    display: block;
+}
+
+.danger .pulse-icon { animation: pulse-red 2s infinite; }
+@keyframes pulse-red {
+    0% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(239, 68, 68, 0)); }
+    50% { transform: scale(1.1); filter: drop-shadow(0 0 20px rgba(239, 68, 68, 0.5)); }
+    100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(239, 68, 68, 0)); }
+}
+
+.hidden { display: none !important; }
+
+/* Existing Styles Override */
+body {
+    padding: 0;
+    overflow-x: hidden;
+}
+
+/* ... (rest of the original styles remain valid) ... */
+
 
 /* Glassmorphism */
 .glass-panel {

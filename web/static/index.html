@@ -3,143 +3,244 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UniDB-Go | Pipeline Visualization</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>UniDB-Go | Enterprise Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
 </head>
 <body>
-    <div class="app-container">
-        <!-- Header -->
-        <header class="glass-panel main-header">
-            <div class="logo">
+    <div class="layout-wrapper">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
                 <span class="logo-icon">🔮</span>
-                <h1>UniDB-Go Engine</h1>
+                <h1>UniDB Engine</h1>
             </div>
-            <div class="status-badge" id="system-status">System Ready</div>
-        </header>
+            
+            <nav class="nav-links">
+                <a class="nav-item active" data-view="dashboard">
+                    <span class="icon">📊</span>
+                    <span>Dashboard</span>
+                </a>
+                <a class="nav-item" data-view="lab">
+                    <span class="icon">🧪</span>
+                    <span>SQL Lab & AST</span>
+                </a>
+                <a class="nav-item" data-view="shield">
+                    <span class="icon">🛡️</span>
+                    <span>Security Shield</span>
+                </a>
+                <a class="nav-item" data-view="explorer">
+                    <span class="icon">📂</span>
+                    <span>DB Explorer</span>
+                </a>
+                <a class="nav-item" data-view="metrics">
+                    <span class="icon">⚙️</span>
+                    <span>Performance</span>
+                </a>
+            </nav>
 
-        <!-- TOP: Query Editor -->
-        <section class="glass-panel feature-section editor-section">
-            <div class="panel-header">
-                <h2>1. Unified SQL Editor</h2>
-                <button id="run-btn" class="primary-btn">
-                    <span>Execute Pipeline</span>
-                    <div class="btn-loader hidden"></div>
-                </button>
+            <div style="margin-top: auto; padding: 1rem;">
+                <div class="status-badge" id="system-status">System Online</div>
             </div>
-            <div class="editor-container">
-                <textarea id="query-input" spellcheck="false">SELECT u.name, o.total 
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            
+            <!-- VIEW: DASHBOARD (Original Pipeline) -->
+            <div id="view-dashboard" class="view">
+                <header style="margin-bottom: 2rem;">
+                    <h2 style="font-size: 2rem;">Execution Pipeline</h2>
+                    <p style="color: var(--text-muted);">Real-time visualization of the query lifecycle across federated databases.</p>
+                </header>
+
+                <div class="app-container">
+                    <!-- Query Editor -->
+                    <section class="glass-panel feature-section editor-section">
+                        <div class="panel-header">
+                            <h2>1. Unified SQL Editor</h2>
+                            <button id="run-btn" class="primary-btn">
+                                <span>Execute Pipeline</span>
+                                <div class="btn-loader hidden"></div>
+                            </button>
+                        </div>
+                        <div class="editor-container">
+                            <textarea id="query-input" spellcheck="false">SELECT u.name, o.total 
 FROM postgres.users u 
 JOIN mysql.orders o ON u.id = o.user_id 
 WHERE u.id > 0</textarea>
-            </div>
-            <!-- Global error banner -->
-            <div id="error-banner" class="error-banner hidden">
-                <span class="error-icon">⚠️</span>
-                <span id="error-text">An error occurred</span>
-            </div>
-            <div id="cache-banner" class="cache-banner hidden">
-                <span class="cache-icon">⚡</span>
-                <span>CACHE HIT: Pipeline execution bypassed. Served from memory.</span>
-            </div>
-        </section>
+                        </div>
+                        <div id="error-banner" class="error-banner hidden">
+                            <span class="error-icon">⚠️</span>
+                            <span id="error-text">An error occurred</span>
+                        </div>
+                        <div id="cache-banner" class="cache-banner hidden">
+                            <span class="cache-icon">⚡</span>
+                            <span>CACHE HIT: Pipeline execution bypassed.</span>
+                        </div>
+                    </section>
 
-        <!-- The Pipeline Line connecting components -->
-        <div class="pipeline-connector"></div>
+                    <div class="pipeline-connector"></div>
 
-        <!-- SECTION 1: Parser & AST -->
-        <section class="glass-panel feature-section pipeline-node" id="section-parser">
-            <div class="section-badge"><div class="icon">🔍</div> Phase 4 </div>
-            <h2>Query Parser & AST Generator</h2>
-            <div class="split-view">
-                <div class="description-side">
-                    <p>The Vitess-based parser intercepts the raw SQL schema and transforms the semantic query into an Abstract Syntax Tree (AST) optimized for cross-database operations.</p>
-                    <div class="block-indicator" id="parser-status">Waiting for execution...</div>
+                    <!-- Pipeline Nodes -->
+                    <section class="glass-panel feature-section pipeline-node" id="section-parser">
+                        <div class="section-badge"><div class="icon">🔍</div> Parser </div>
+                        <h2>AST Generator</h2>
+                        <div class="split-view">
+                            <div class="description-side">
+                                <p>Transforms raw SQL into an Abstract Syntax Tree optimized for cross-db operations.</p>
+                                <div class="block-indicator" id="parser-status">Waiting...</div>
+                            </div>
+                            <div class="data-side">
+                                <pre><code id="ast-json" class="language-json">No AST Generated.</code></pre>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div class="pipeline-connector"></div>
+
+                    <section class="glass-panel feature-section pipeline-node" id="section-security">
+                        <div class="section-badge"><div class="icon">🛡️</div> Security </div>
+                        <h2>Threat Engine</h2>
+                        <div class="split-view">
+                            <div class="description-side">
+                                <p>Scans for injection attacks and behavior anomalies using heuristic AST analysis.</p>
+                            </div>
+                            <div class="data-side flex-center">
+                                <div class="security-card" id="security-card">
+                                    <div class="sec-status" id="sec-status">Awaiting...</div>
+                                    <div class="sec-reason" id="sec-reason">-</div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div class="pipeline-connector"></div>
+
+                    <section class="glass-panel feature-section pipeline-node" id="section-planner">
+                        <div class="section-badge"><div class="icon">🧠</div> Planner </div>
+                        <h2>NoSQL Routing</h2>
+                        <div class="split-view">
+                            <div class="description-side">
+                                <p>Breaks down the plan into DB-specific physical routes with dynamic BSON translation.</p>
+                                <div class="block-indicator" id="planner-status">Waiting...</div>
+                            </div>
+                            <div class="data-side">
+                                <div id="plan-container" class="plan-cards"></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div class="pipeline-connector"></div>
+
+                    <section class="glass-panel feature-section pipeline-node" id="section-executor">
+                        <div class="section-badge" style="background:var(--accent);"><div class="icon">⚡</div> Executor </div>
+                        <h2>Federated Results</h2>
+                        <div class="table-container" id="results-table-container">
+                            <div class="empty-state" id="results-empty">Run query to see results.</div>
+                            <table id="results-table" class="hidden">
+                                <thead><tr id="results-thead"></tr></thead>
+                                <tbody id="results-tbody"></tbody>
+                            </table>
+                        </div>
+                    </section>
                 </div>
-                <div class="data-side">
-                    <pre><code id="ast-json" class="language-json">No AST Generated.</code></pre>
-                </div>
             </div>
-        </section>
 
-        <div class="pipeline-connector"></div>
-
-        <!-- SECTION 2: Security Engine -->
-        <section class="glass-panel feature-section pipeline-node" id="section-security">
-            <div class="section-badge"><div class="icon">🛡️</div> Phase 7 </div>
-            <h2>Security Threat Engine</h2>
-            <div class="split-view">
-                <div class="description-side">
-                    <p>The underlying AST acts as a defensive shield. It scans for injected attack queries (e.g. 1=1), behavior anomalies, and triggers if data exfiltration patterns match sensitive tables.</p>
-                </div>
-                <div class="data-side flex-center">
-                    <div class="security-card" id="security-card">
-                        <div class="sec-status" id="sec-status">Awaiting Query...</div>
-                        <div class="sec-reason" id="sec-reason">-</div>
+            <!-- VIEW: SQL LAB -->
+            <div id="view-lab" class="view hidden">
+                <header style="margin-bottom: 2rem;">
+                    <h2 style="font-size: 2rem;">SQL Lab & AST Explorer</h2>
+                    <p style="color: var(--text-muted);">Deep-dive into query parsing and tree generation.</p>
+                </header>
+                
+                <div class="lab-grid">
+                    <div class="glass-panel">
+                        <h2>Query Editor</h2>
+                        <div class="editor-container" style="height: 400px;">
+                            <textarea id="lab-query-input" spellcheck="false" placeholder="Write your SQL here..."></textarea>
+                        </div>
+                        <button id="lab-parse-btn" class="primary-btn" style="margin-top: 1.5rem; width: 100%;">
+                            <span>Parse to AST</span>
+                        </button>
+                    </div>
+                    <div class="ast-tree-container">
+                        <h2 style="font-size: 1rem; margin-bottom: 1rem; opacity: 0.7;">ABSTRACT SYNTAX TREE</h2>
+                        <pre><code id="lab-ast-output" class="language-json">{}</code></pre>
                     </div>
                 </div>
             </div>
-        </section>
 
-        <div class="pipeline-connector"></div>
+            <!-- VIEW: SECURITY SHIELD -->
+            <div id="view-shield" class="view hidden">
+                <header style="margin-bottom: 2rem; text-align: center;">
+                    <h2 style="font-size: 2rem;">Security Shield Playground</h2>
+                    <p style="color: var(--text-muted);">Test the engine's resilience against SQL injection and malicious patterns.</p>
+                </header>
 
-        <!-- SECTION 3: Smart Planner & NoSQL Translation -->
-        <section class="glass-panel feature-section pipeline-node" id="section-planner">
-            <div class="section-badge"><div class="icon">🧠</div> Phases 2 & 5 </div>
-            <h2>Smart Planner & NoSQL Routing</h2>
-            <div class="split-view">
-                <div class="description-side">
-                    <p>The planner breaks down the generic Logical Plan into DB-specific physical routes deciding which database instances hold what tables. Advanced NoSQL drivers will intercept routing to execute BSON transformations dynamically.</p>
-                    <div class="block-indicator" id="planner-status">Waiting...</div>
-                </div>
-                <div class="data-side">
-                    <div id="plan-container" class="plan-cards">
-                        <div class="empty-state">No execution plan generated.</div>
+                <div class="shield-container">
+                    <div class="glass-panel security-playground">
+                        <div class="editor-container" style="height: 100px; margin-bottom: 1.5rem;">
+                            <textarea id="shield-input" placeholder="Enter query to test (e.g. SELECT * FROM users WHERE id = 1 OR 1=1)"></textarea>
+                        </div>
+                        <div id="shield-result-card" class="sec-result-card">
+                            <span class="pulse-icon">🛡️</span>
+                            <h3 id="shield-status-text" style="font-size: 1.5rem; margin-bottom: 0.5rem;">Ready to Scan</h3>
+                            <p id="shield-reason-text" style="color: var(--text-muted);">Enter a query to test security heuristics.</p>
+                        </div>
                     </div>
                 </div>
             </div>
-        </section>
 
-        <div class="pipeline-connector"></div>
+            <!-- VIEW: EXPLORER -->
+            <div id="view-explorer" class="view hidden">
+                <header style="margin-bottom: 2rem;">
+                    <h2 style="font-size: 2rem;">Database Explorer</h2>
+                    <p style="color: var(--text-muted);">Browse schemas and metadata across all connected instances.</p>
+                </header>
 
-        <!-- SECTION 4: Performance & Pooling -->
-        <section class="glass-panel feature-section pipeline-node" id="section-stats">
-            <div class="section-badge"><div class="icon">⚙️</div> Phase 8 </div>
-            <h2>Dynamic Connection Management</h2>
-            <p style="margin-bottom: 1.5rem; color: var(--text-muted);">Simulated Adaptive Pool Managers assigning live execution threads per DB connector.</p>
-            <div class="stats-grid" id="stats-grid">
-                <div class="empty-state">Loading live pool statistics...</div>
-            </div>
-        </section>
-
-        <div class="pipeline-connector"></div>
-
-        <!-- SECTION 5: Final Combined Execution -->
-        <section class="glass-panel feature-section pipeline-node" id="section-executor">
-            <div class="section-badge" style="background:var(--accent);"><div class="icon">⚡</div> Phases 3 & 6 </div>
-            <h2>Final Federation Execution</h2>
-            <p style="margin-bottom: 1.5rem; color: var(--text-muted);">The separate physical routes fetch payload independently before routing to the Memory Hash-Join Merger for single-API response delivery.</p>
-            
-            <div class="table-container" id="results-table-container">
-                <div class="empty-state" id="results-empty">Run a query to see final federated results.</div>
-                <table id="results-table" class="hidden">
-                    <thead><tr id="results-thead"></tr></thead>
-                    <tbody id="results-tbody"></tbody>
-                </table>
+                <div class="explorer-grid">
+                    <div class="schema-list" id="explorer-schema-list">
+                        <!-- Populated by JS -->
+                        <div class="empty-state">Loading schemas...</div>
+                    </div>
+                    <div class="explorer-details" id="explorer-details">
+                        <div class="empty-state">Select a table to view details.</div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Execution Pipeline Metrics -->
-            <div class="metrics-bar hidden" id="metrics-bar" style="margin-top: 1.5rem;">
-                <div class="metric"><label>Total Duration:</label> <span id="m-total">0ms</span></div>
-                <div class="metric"><label>Security:</label> <span id="m-security">0ms</span></div>
-                <div class="metric"><label>AST Parse:</label> <span id="m-parse">0ms</span></div>
-                <div class="metric"><label>Planner:</label> <span id="m-plan">0ms</span></div>
-                <div class="metric"><label>Federation Exec:</label> <span id="m-exec">0ms</span></div>
-            </div>
-        </section>
+            <!-- VIEW: PERFORMANCE -->
+            <div id="view-metrics" class="view hidden">
+                <header style="margin-bottom: 2rem;">
+                    <h2 style="font-size: 2rem;">System Performance</h2>
+                    <p style="color: var(--text-muted);">Live connection pooling and execution latency metrics.</p>
+                </header>
 
+                <section class="glass-panel" style="margin-bottom: 2rem;">
+                    <h2>Active Connection Pools</h2>
+                    <div class="stats-grid" id="metrics-stats-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </section>
+
+                <section class="glass-panel">
+                    <h2>Latency Breakdown</h2>
+                    <div class="metrics-bar" id="metrics-latency-bar">
+                        <div class="metric"><label>Total:</label> <span id="pm-total">0ms</span></div>
+                        <div class="metric"><label>Security:</label> <span id="pm-security">0ms</span></div>
+                        <div class="metric"><label>Parse:</label> <span id="pm-parse">0ms</span></div>
+                        <div class="metric"><label>Plan:</label> <span id="pm-plan">0ms</span></div>
+                        <div class="metric"><label>Exec:</label> <span id="pm-exec">0ms</span></div>
+                    </div>
+                </section>
+            </div>
+
+        </main>
     </div>
+
     <script src="app.js"></script>
 </body>
 </html>
