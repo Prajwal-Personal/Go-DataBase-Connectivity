@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/xwb1989/sqlparser"
 )
@@ -13,7 +14,22 @@ func Parse(query string) (*QueryAST, error) {
 		return ast, nil
 	}
 
-	stmt, err := sqlparser.Parse(query)
+	// Simple multi-statement handling: parse only the first non-empty statement
+	// to avoid syntax errors from multiple queries.
+	statements := strings.Split(query, ";")
+	var activeQuery string
+	for _, s := range statements {
+		if trimmed := strings.TrimSpace(s); trimmed != "" {
+			activeQuery = trimmed
+			break
+		}
+	}
+
+	if activeQuery == "" {
+		return nil, fmt.Errorf("no valid SQL statement found")
+	}
+
+	stmt, err := sqlparser.Parse(activeQuery)
 	if err != nil {
 		return nil, fmt.Errorf("parse error: %w", err)
 	}

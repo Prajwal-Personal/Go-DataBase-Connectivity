@@ -76,9 +76,42 @@ func extractTables(expr sqlparser.TableExpr, ast *QueryAST) {
 			})
 		}
 	case *sqlparser.JoinTableExpr:
-		ast.Joins = append(ast.Joins, JoinNode{
+		joinNode := JoinNode{
 			Type: t.Join,
-		})
+		}
+
+		// Try to identify Left and Right tables/aliases
+		if left, ok := t.LeftExpr.(*sqlparser.AliasedTableExpr); ok {
+			joinNode.LeftTable = left.As.String()
+			if joinNode.LeftTable == "" {
+				if te, ok := left.Expr.(sqlparser.TableName); ok {
+					joinNode.LeftTable = te.Name.String()
+				}
+			}
+		}
+
+		if right, ok := t.RightExpr.(*sqlparser.AliasedTableExpr); ok {
+			joinNode.RightTable = right.As.String()
+			if joinNode.RightTable == "" {
+				if te, ok := right.Expr.(sqlparser.TableName); ok {
+					joinNode.RightTable = te.Name.String()
+				}
+			}
+		}
+
+		// Extract ON condition
+		if t.Condition.On != nil {
+			if comp, ok := t.Condition.On.(*sqlparser.ComparisonExpr); ok {
+				joinNode.On = ConditionNode{
+					Left:     sqlparser.String(comp.Left),
+					Operator: comp.Operator,
+					Right:    sqlparser.String(comp.Right),
+				}
+			}
+		}
+
+		ast.Joins = append(ast.Joins, joinNode)
+
 		// Recursively extract from Left and Right
 		extractTables(t.LeftExpr, ast)
 		extractTables(t.RightExpr, ast)
